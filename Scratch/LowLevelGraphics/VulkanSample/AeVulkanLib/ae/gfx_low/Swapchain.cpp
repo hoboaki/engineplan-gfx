@@ -27,20 +27,21 @@ void Swapchain::AcquireNextImage()
     auto& device = swapchainMaster_->Device();
     {
         currentFrameIndex_ =
-            (currentFrameIndex_ + 1) % frameProperties_.Count();
+            (currentFrameIndex_ + 1) % syncProperties_.Count();
         currentFrameIndex_ = base::Math::Clamp(
             currentFrameIndex_,
             0,
-            frameProperties_.Count() - 1);
+            syncProperties_.Count() - 1);
         auto currentBufferIdxUint = uint32_t();
         auto result = device.NativeObject_().acquireNextImageKHR(
             swapchain_,
             UINT64_MAX,
-            frameProperties_[currentFrameIndex_].AcquireEvent->NativeObject_(),
+            syncProperties_[currentFrameIndex_].AcquireEvent->NativeObject_(),
             ::vk::Fence(),
             &currentBufferIdxUint);
+        currentImageIndex_ = int(currentBufferIdxUint);
         AE_BASE_ASSERT(result == vk::Result::eSuccess);
-        AE_BASE_ASSERT_EQUALS(currentFrameIndex_, int(currentBufferIdxUint));
+        AE_BASE_ASSERT_MIN_TERM(currentImageIndex_, 0, imageProperties_.Count());
     }
 }
 
@@ -70,12 +71,15 @@ void Swapchain::Initialize_(
             AE_BASE_ASSERT_LESS(0, minImageCount);
         }
 
-        frameProperties_.Resize(
+        syncProperties_.Resize(
+            int(swapchainImageCount),
+            &swapchainMaster_->Device().System().ObjectAllocator_());
+        imageProperties_.Resize(
             int(swapchainImageCount),
             &swapchainMaster_->Device().System().ObjectAllocator_());
 
         base::RuntimeArray<::vk::Image> swapchainImages(
-            frameProperties_.Count(),
+            imageProperties_.Count(),
             &device.System().TempWorkAllocator_());
         {
             const auto result = device.NativeObject_().getSwapchainImagesKHR(
@@ -85,11 +89,14 @@ void Swapchain::Initialize_(
             AE_BASE_ASSERT(result == ::vk::Result::eSuccess);
         }
 
-        for (int i = 0; i < frameProperties_.Count(); ++i) {
-            auto& target = frameProperties_[i];
+        for (int i = 0; i < syncProperties_.Count(); ++i) {
+            auto& target = syncProperties_[i];
             target.AcquireEvent.Init(EventCreateInfo().SetDevice(&device));
             target.ReadyToPresentEvent.Init(
                 EventCreateInfo().SetDevice(&device));
+        }
+        for (int i = 0; i < imageProperties_.Count(); ++i) {
+            auto& target = imageProperties_[i];
             target.ImageResource.Init(
                 ImageResourceCreateInfo()
                     .SetDevice(&device)
@@ -104,6 +111,7 @@ void Swapchain::Initialize_(
     }
     uniqueId_ = uniqueId;
     currentFrameIndex_ = -1;
+    currentImageIndex_ = -1;
     AE_BASE_ASSERT(IsInitialized_());
 }
 
@@ -115,10 +123,13 @@ void Swapchain::Finalize_()
     }
     uniqueId_ = InvalidUniqueId_;
     {
-        for (int i = frameProperties_.Count() - 1; 0 <= i; --i) {
-            auto& target = frameProperties_[i];
+        for (int i = imageProperties_.Count() - 1; 0 <= i; --i) {
+            auto& target = imageProperties_[i];
             target.RenderTargetImageView.Reset();
             target.ImageResource.Reset();
+        }
+        for (int i = syncProperties_.Count() - 1; 0 <= i; --i) {
+            auto& target = syncProperties_[i];
             target.ReadyToPresentEvent.Reset();
             target.AcquireEvent.Reset();
         }

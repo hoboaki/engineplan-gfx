@@ -60,7 +60,7 @@ public:
     /// アクティブなバックバッファを指す RenderTargetImageView を取得。
     RenderTargetImageView& CurrentRenderTargetImageView() const
     {
-        return frameProperties_[currentFrameIndex_].RenderTargetImageView.Ref();
+        return imageProperties_[currentImageIndex_].RenderTargetImageView.Ref();
     }
     //@}
 
@@ -88,15 +88,15 @@ public:
 
     Event& CurrentAcquireEvent_()
     {
-        return *frameProperties_[currentFrameIndex_].AcquireEvent;
+        return *syncProperties_[currentFrameIndex_].AcquireEvent;
     }
 
     Event& CurrentReadyToPresentEvent_()
     {
-        return *frameProperties_[currentFrameIndex_].ReadyToPresentEvent;
+        return *syncProperties_[currentFrameIndex_].ReadyToPresentEvent;
     }
 
-    int CurrentBufferIndex_() const { return currentFrameIndex_; }
+    int CurrentBufferIndex_() const { return currentImageIndex_; }
 
     /// ユニークID。古くなった Handle の Valid 判定で使う。
     uint32_t UniqueId_() const { return uniqueId_; }
@@ -107,15 +107,9 @@ protected:
     Swapchain() {}
 
 private:
-    /// １フレームあたりのプロパティ。
-    class FrameProperty {
+    /// １フレームあたりの画像に関するプロパティ。
+    class ImageProperty {
     public:
-        /// バックバッファ化同期用イベント。
-        base::Placement<Event> AcquireEvent;
-
-        /// Present 処理可能状態同期用イベント。
-        base::Placement<Event> ReadyToPresentEvent;
-
         /// イメージリソース。
         base::Placement<ImageResource> ImageResource;
 
@@ -125,12 +119,27 @@ private:
         /// @todo ImageView の追加。
     };
 
+    /// １フレームあたりの同期に関するプロパティ。
+    /// @details
+    /// ImageProperty は必ずしも 0,1,2,0,1,... と巡回するわけではないので
+    /// 同期に関するプロパティは分けて管理する。
+    class SyncProperty {
+    public:
+        /// バックバッファ化同期用イベント。
+        base::Placement<Event> AcquireEvent;
+
+        /// Present 処理可能状態同期用イベント。
+        base::Placement<Event> ReadyToPresentEvent;
+    };
+
     ::ae::base::Pointer<gfx_low::SwapchainMaster> swapchainMaster_;
     ::vk::SwapchainKHR swapchain_;
     gfx_low::RenderTargetSpecInfo renderTargetSpecInfo_;
-    ::ae::base::RuntimeArray<FrameProperty> frameProperties_;
+    ::ae::base::RuntimeArray<SyncProperty> syncProperties_;
+    ::ae::base::RuntimeArray<ImageProperty> imageProperties_;
     uint32_t uniqueId_ = InvalidUniqueId_;
     int currentFrameIndex_ = int(); // 初期化直後は負の値が入っている
+    int currentImageIndex_ = int(); // 初期化直後は負の値が入っている
 };
 
 } // namespace ae::gfx_low
