@@ -32,9 +32,9 @@ AdelEngine GfxLowApi のオーバービューは [ApiOverview.md](./ApiOverview.
 
 **Windows**
 
-- Windows10 1903
-- Visual Studio 2019 : 16.11.2
-- Vulkan SDK : 1.2.182.0
+- Windows11 24H2
+- Visual Studio 2022 : 17.14.0
+- Vulkan SDK : 1.2.189.2
 - clang-format : 12.0.1
 
 **macOS**
