@@ -33,7 +33,7 @@ struct TypeTraits
     {
         enum
         {
-            Value = ::std::is_scaler<T>::value
+            Value = ::std::is_scalar<T>::value
         };
     };
 #else
